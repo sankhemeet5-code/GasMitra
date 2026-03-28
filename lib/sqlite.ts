@@ -531,6 +531,25 @@ function createSchema() {
       FOREIGN KEY (distributor_id) REFERENCES distributors(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS rebooking_requests (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL,
+      distributor_id TEXT NOT NULL,
+      urgency TEXT NOT NULL CHECK (urgency IN ('medical', 'bpl', 'regular')),
+      cylinders_requested INTEGER NOT NULL,
+      priority_score REAL,
+      priority_band TEXT CHECK (priority_band IN ('low', 'medium', 'high')),
+      ml_source TEXT CHECK (ml_source IN ('ml-service', 'heuristic-fallback')),
+      status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+      requested_at TEXT NOT NULL,
+      reviewed_at TEXT,
+      review_note TEXT,
+      approved_booking_id TEXT,
+      FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
+      FOREIGN KEY (distributor_id) REFERENCES distributors(id) ON DELETE CASCADE,
+      FOREIGN KEY (approved_booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+    );
+
     CREATE TABLE IF NOT EXISTS system_config (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -573,6 +592,8 @@ function createSchema() {
     CREATE INDEX IF NOT EXISTS idx_bookings_household ON bookings(household_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_distributor ON bookings(distributor_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_status_priority ON bookings(status, priority_score DESC);
+    CREATE INDEX IF NOT EXISTS idx_rebooking_requests_status_requested_at ON rebooking_requests(status, requested_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_rebooking_requests_household ON rebooking_requests(household_id);
     CREATE INDEX IF NOT EXISTS idx_auth_accounts_role_login_id ON auth_accounts(role, login_id);
     CREATE INDEX IF NOT EXISTS idx_login_events_created_at ON login_events(created_at DESC);
   `);

@@ -8,12 +8,7 @@ import { MlPriorityPanel } from "@/components/ml-priority-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
-const mockReplies = [
-  "Demand will increase in Aurangabad due to low stock levels.",
-  "Re-route one truck from Pune to Mumbai to reduce waiting time by 18%.",
-  "Flag rapid repeated bookings from 97XXXX1021 for manual verification.",
-];
+import { AI_INSIGHT_REPLIES } from "@/data/ai-insight-replies";
 
 export default function AIInsightsPage() {
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
@@ -21,7 +16,7 @@ export default function AIInsightsPage() {
 
   const sendMessage = () => {
     if (!input.trim()) return;
-    const reply = mockReplies[messages.length % mockReplies.length];
+    const reply = AI_INSIGHT_REPLIES[messages.length % AI_INSIGHT_REPLIES.length];
     setMessages((prev) => [
       ...prev,
       { role: "user", text: input },

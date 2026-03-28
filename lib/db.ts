@@ -5,6 +5,10 @@ type Urgency = "medical" | "bpl" | "regular";
 type PriorityBand = "low" | "medium" | "high";
 type MlSource = "ml-service" | "heuristic-fallback";
 type BookingStatus = "pending" | "delivered" | "cancelled";
+type RebookingRequestStatus = "pending" | "approved" | "rejected";
+
+export const BOOKING_LOCK_DAYS = 30;
+export const MAX_LOCK_PERIOD_REQUESTS = 2;
 
 function mapHousehold(row: any) {
   return {
@@ -48,6 +52,24 @@ function mapBooking(row: any) {
     priorityScore: row.priority_score,
     priorityBand: row.priority_band,
     mlSource: row.ml_source,
+  };
+}
+
+function mapRebookingRequest(row: any) {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    distributorId: row.distributor_id,
+    urgency: row.urgency,
+    cylindersRequested: row.cylinders_requested,
+    priorityScore: row.priority_score,
+    priorityBand: row.priority_band,
+    mlSource: row.ml_source,
+    status: row.status,
+    requestedAt: row.requested_at,
+    reviewedAt: row.reviewed_at,
+    reviewNote: row.review_note,
+    approvedBookingId: row.approved_booking_id,
   };
 }
 
@@ -297,9 +319,10 @@ export async function createBooking(data: {
   priorityScore: number;
   priorityBand: PriorityBand;
   mlSource: MlSource;
+  queuePosition?: number;
 }) {
   const id = `bk-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const queuePosition = Math.ceil(Math.random() * 15);
+  const queuePosition = data.queuePosition ?? Math.ceil(Math.random() * 15);
   const requestDate = new Date().toISOString().split("T")[0];
   const createdAt = new Date().toISOString();
 
@@ -325,6 +348,11 @@ export async function createBooking(data: {
     createdAt
   );
 
+  db.prepare("UPDATE households SET last_booking_date = ? WHERE id = ?").run(
+    requestDate,
+    data.householdId
+  );
+
   const booking = db.prepare("SELECT * FROM bookings WHERE id = ?").get(id) as any;
   const household = await getHouseholdById(data.householdId);
   const distributor = await getDistributorById(data.distributorId);
@@ -333,6 +361,280 @@ export async function createBooking(data: {
     ...mapBooking(booking),
     household,
     distributor,
+  };
+}
+
+function toDay(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+export async function getBookingLockStatus(householdId: string) {
+  const row = db
+    .prepare(
+      `
+      SELECT request_date
+      FROM bookings
+      WHERE household_id = ?
+      ORDER BY request_date DESC, created_at DESC
+      LIMIT 1
+    `
+    )
+    .get(householdId) as { request_date?: string } | undefined;
+
+  if (!row?.request_date) {
+    return {
+      lockDays: BOOKING_LOCK_DAYS,
+      isLocked: false,
+      remainingDays: 0,
+      lastBookingDate: null,
+    };
+  }
+
+  const now = new Date();
+  const last = toDay(row.request_date);
+  const daysElapsed = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingDays = Math.max(0, BOOKING_LOCK_DAYS - daysElapsed);
+
+  return {
+    lockDays: BOOKING_LOCK_DAYS,
+    isLocked: remainingDays > 0,
+    remainingDays,
+    lastBookingDate: row.request_date,
+  };
+}
+
+export async function getLockPeriodRequestAllowance(householdId: string) {
+  const lockStatus = await getBookingLockStatus(householdId);
+
+  if (!lockStatus.lastBookingDate) {
+    return {
+      ...lockStatus,
+      maxRequests: MAX_LOCK_PERIOD_REQUESTS,
+      usedRequests: 0,
+      remainingRequests: MAX_LOCK_PERIOD_REQUESTS,
+    };
+  }
+
+  const usedRequests = db
+    .prepare(
+      `
+      SELECT COUNT(*) as count
+      FROM rebooking_requests
+      WHERE household_id = ?
+        AND requested_at >= ?
+    `
+    )
+    .get(householdId, `${lockStatus.lastBookingDate}T00:00:00.000Z`) as {
+    count: number;
+  };
+
+  const used = usedRequests?.count ?? 0;
+  const remaining = Math.max(0, MAX_LOCK_PERIOD_REQUESTS - used);
+
+  return {
+    ...lockStatus,
+    maxRequests: MAX_LOCK_PERIOD_REQUESTS,
+    usedRequests: used,
+    remainingRequests: remaining,
+  };
+}
+
+async function getRebookingRequestById(id: string) {
+  const row = db
+    .prepare(
+      `
+      SELECT r.*, h.name as h_name, h.pincode as h_pincode,
+             d.name as d_name, d.pincode as d_pincode
+      FROM rebooking_requests r
+      JOIN households h ON h.id = r.household_id
+      JOIN distributors d ON d.id = r.distributor_id
+      WHERE r.id = ?
+    `
+    )
+    .get(id) as any;
+
+  if (!row) return null;
+
+  return {
+    ...mapRebookingRequest(row),
+    household: {
+      id: row.household_id,
+      name: row.h_name,
+      pincode: row.h_pincode,
+    },
+    distributor: {
+      id: row.distributor_id,
+      name: row.d_name,
+      pincode: row.d_pincode,
+    },
+  };
+}
+
+export async function getRebookingRequests(filters?: {
+  status?: RebookingRequestStatus;
+  householdId?: string;
+}) {
+  const conditions: string[] = [];
+  const params: Array<string> = [];
+
+  if (filters?.status) {
+    conditions.push("r.status = ?");
+    params.push(filters.status);
+  }
+
+  if (filters?.householdId) {
+    conditions.push("r.household_id = ?");
+    params.push(filters.householdId);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const rows = db
+    .prepare(
+      `
+      SELECT r.*, h.name as h_name, h.pincode as h_pincode,
+             d.name as d_name, d.pincode as d_pincode
+      FROM rebooking_requests r
+      JOIN households h ON h.id = r.household_id
+      JOIN distributors d ON d.id = r.distributor_id
+      ${whereClause}
+      ORDER BY r.requested_at DESC
+    `
+    )
+    .all(...params) as any[];
+
+  return rows.map((row) => ({
+    ...mapRebookingRequest(row),
+    household: {
+      id: row.household_id,
+      name: row.h_name,
+      pincode: row.h_pincode,
+    },
+    distributor: {
+      id: row.distributor_id,
+      name: row.d_name,
+      pincode: row.d_pincode,
+    },
+  }));
+}
+
+export async function createRebookingRequest(data: {
+  householdId: string;
+  distributorId: string;
+  urgency: Urgency;
+  cylindersRequested: number;
+  priorityScore: number;
+  priorityBand: PriorityBand;
+  mlSource: MlSource;
+  reviewNote?: string;
+}) {
+  const id = `rbreq-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const requestedAt = new Date().toISOString();
+
+  db.prepare(
+    `
+    INSERT INTO rebooking_requests (
+      id, household_id, distributor_id, urgency, cylinders_requested,
+      priority_score, priority_band, ml_source, status, requested_at, review_note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+  `
+  ).run(
+    id,
+    data.householdId,
+    data.distributorId,
+    data.urgency,
+    data.cylindersRequested,
+    data.priorityScore,
+    data.priorityBand,
+    data.mlSource,
+    requestedAt,
+    data.reviewNote ?? null
+  );
+
+  return getRebookingRequestById(id);
+}
+
+export async function reviewRebookingRequest(data: {
+  requestId: string;
+  decision: "approved" | "rejected";
+  reviewNote?: string;
+}) {
+  const current = db
+    .prepare("SELECT * FROM rebooking_requests WHERE id = ?")
+    .get(data.requestId) as any;
+
+  if (!current) {
+    return { ok: false as const, reason: "not_found" as const };
+  }
+
+  if (current.status !== "pending") {
+    return { ok: false as const, reason: "already_reviewed" as const };
+  }
+
+  const now = new Date().toISOString();
+
+  if (data.decision === "rejected") {
+    db.prepare(
+      `
+      UPDATE rebooking_requests
+      SET status = 'rejected', reviewed_at = ?, review_note = ?
+      WHERE id = ?
+    `
+    ).run(now, data.reviewNote ?? null, data.requestId);
+
+    const request = await getRebookingRequestById(data.requestId);
+    return { ok: true as const, request, booking: null };
+  }
+
+  const bookingId = `bk-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const queuePosition = Math.ceil(Math.random() * 15);
+  const requestDate = now.split("T")[0];
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+      INSERT INTO bookings (
+        id, household_id, distributor_id, request_date, cylinders_requested,
+        urgency, queue_position, status, priority_score, priority_band, ml_source, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+    `
+    ).run(
+      bookingId,
+      current.household_id,
+      current.distributor_id,
+      requestDate,
+      current.cylinders_requested,
+      current.urgency,
+      queuePosition,
+      current.priority_score ?? 50,
+      current.priority_band ?? "medium",
+      current.ml_source ?? "heuristic-fallback",
+      now
+    );
+
+    db.prepare("UPDATE households SET last_booking_date = ? WHERE id = ?").run(
+      requestDate,
+      current.household_id
+    );
+
+    db.prepare(
+      `
+      UPDATE rebooking_requests
+      SET status = 'approved', reviewed_at = ?, review_note = ?, approved_booking_id = ?
+      WHERE id = ?
+    `
+    ).run(now, data.reviewNote ?? null, bookingId, data.requestId);
+  });
+
+  tx();
+
+  const request = await getRebookingRequestById(data.requestId);
+  const booking = db.prepare("SELECT * FROM bookings WHERE id = ?").get(bookingId) as any;
+
+  return {
+    ok: true as const,
+    request,
+    booking: booking ? mapBooking(booking) : null,
   };
 }
 

@@ -1,6 +1,6 @@
 export type CrisisLevel = "normal" | "alert" | "emergency";
 export type UrgencyType = "medical" | "bpl" | "regular";
-export type BookingStatus = "pending" | "delivered";
+export type BookingStatus = "pending" | "delivered" | "cancelled";
 export type UserRole = "customer" | "distributor" | "admin";
 
 export interface CustomerProfile {
@@ -70,4 +70,30 @@ export interface PriorityPredictionResponse {
   priority_band: "low" | "medium" | "high";
   source: "ml-service" | "heuristic-fallback";
   note?: string;
+}
+
+export interface RebookingRequest {
+  id: string;
+  householdId: string;
+  distributorId: string;
+  urgency: UrgencyType;
+  cylindersRequested: number;
+  priorityScore?: number;
+  priorityBand?: "low" | "medium" | "high";
+  mlSource?: "ml-service" | "heuristic-fallback";
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  approvedBookingId?: string | null;
+  household?: {
+    id: string;
+    name: string;
+    pincode: string;
+  };
+  distributor?: {
+    id: string;
+    name: string;
+    pincode: string;
+  };
 }

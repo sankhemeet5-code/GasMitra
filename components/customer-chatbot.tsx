@@ -128,6 +128,7 @@ function formatTime(date: Date) {
 
 export function CustomerChatbot() {
   const [open, setOpen] = useState(false);
+  const [showPulse, setShowPulse] = useState(true);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -151,6 +152,11 @@ export function CustomerChatbot() {
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 300);
   }, [open]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowPulse(false), 2400);
+    return () => clearTimeout(timer);
+  }, []);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
@@ -207,9 +213,9 @@ export function CustomerChatbot() {
   return (
     <>
       {/* ── Floating trigger button ── */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-6 right-6 z-40">
         {/* Pulse ring when closed */}
-        {!open && (
+        {!open && showPulse && (
           <span className="absolute inset-0 rounded-full bg-teal-500 opacity-30 animate-ping" />
         )}
         <button
@@ -217,7 +223,7 @@ export function CustomerChatbot() {
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Close chat" : "Open GasSafe Assistant"}
           className={cn(
-            "relative flex h-14 w-14 items-center justify-center rounded-full shadow-2xl transition-all duration-300",
+            "relative flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-2xl transition-all duration-200",
             open
               ? "bg-slate-700 hover:bg-slate-600 rotate-0"
               : "bg-teal-500 hover:bg-teal-400 hover:scale-110"
@@ -230,12 +236,12 @@ export function CustomerChatbot() {
       {/* ── Chat panel ── */}
       <div
         className={cn(
-          "fixed bottom-24 right-6 z-50 flex w-[360px] max-w-[calc(100vw-1.5rem)] flex-col rounded-2xl border border-slate-700/60 bg-slate-900/95 shadow-2xl backdrop-blur-xl transition-all duration-300 origin-bottom-right",
+          "fixed bottom-24 right-6 z-40 flex w-[360px] max-w-[calc(100vw-1.5rem)] flex-col rounded-2xl border border-slate-700/60 bg-slate-900/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-bottom-right",
           open
             ? "opacity-100 scale-100 pointer-events-auto"
             : "opacity-0 scale-95 pointer-events-none"
         )}
-        style={{ height: "520px" }}
+        style={{ height: "400px" }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 rounded-t-2xl border-b border-slate-700/60 bg-gradient-to-r from-teal-600/20 to-slate-900 px-4 py-3">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   createBooking,
   getBookings,
+  getBookingLockStatus,
   getBookingsByHouseholdId,
   getPendingBookings,
 } from "@/lib/db";
@@ -20,6 +21,18 @@ export async function GET(request: Request) {
     if (action === "all") {
       const bookings = await getBookings();
       return NextResponse.json(bookings);
+    }
+
+    if (action === "lock-status") {
+      if (!householdId) {
+        return NextResponse.json(
+          { error: "householdId is required for lock-status" },
+          { status: 400 }
+        );
+      }
+
+      const status = await getBookingLockStatus(householdId);
+      return NextResponse.json(status);
     }
 
     if (!householdId) {
@@ -53,10 +66,29 @@ export async function POST(request: Request) {
       mlSource,
     } = body;
 
+    const normalizedPriorityBand =
+      priorityBand === "high" || priorityBand === "medium" || priorityBand === "low"
+        ? priorityBand
+        : "medium";
+    const normalizedMlSource =
+      mlSource === "heuristic-fallback" ? "heuristic-fallback" : "ml-service";
+
     if (!householdId || !distributorId || !urgency || !cylindersRequested) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
+      );
+    }
+
+    const lockStatus = await getBookingLockStatus(householdId);
+    if (lockStatus.isLocked) {
+      return NextResponse.json(
+        {
+          error: "Booking locked due to 30-day lock-in period",
+          code: "LOCK_IN_ACTIVE",
+          ...lockStatus,
+        },
+        { status: 409 }
       );
     }
 
@@ -66,8 +98,8 @@ export async function POST(request: Request) {
       urgency,
       cylindersRequested,
       priorityScore,
-      priorityBand,
-      mlSource,
+      priorityBand: normalizedPriorityBand,
+      mlSource: normalizedMlSource,
     });
 
     return NextResponse.json(booking, { status: 201 });

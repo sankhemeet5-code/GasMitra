@@ -10,6 +10,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useAppStore } from "@/hooks/use-app-store";
 import Link from "next/link";
 import { Booking } from "@/types";
+import { PackageSearch } from "lucide-react";
 
 const getScoreBadgeColor = (score: number) => {
   if (score >= 70) return "bg-red-500";
@@ -70,12 +71,14 @@ export default function BookingsPage() {
   return (
     <RoleGuard>
       <AppShell>
-        <h1 className="mb-4 text-2xl font-bold">My Bookings</h1>
+        <h2 className="mb-4 text-2xl font-bold">My Bookings</h2>
 
         {isLoading && (
           <Card>
-            <CardContent className="py-8 text-center text-slate-400">
-              Loading your bookings...
+            <CardContent className="space-y-3 py-6">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-11 animate-pulse rounded-md bg-slate-800/70" />
+              ))}
             </CardContent>
           </Card>
         )}
@@ -93,11 +96,13 @@ export default function BookingsPage() {
             <CardHeader>
               <CardTitle>Booking History</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
+            <CardContent>
               {dbBookings.length === 0 ? (
                 /* ── Empty state ── */
                 <div className="flex flex-col items-center gap-3 py-14 text-center text-slate-500">
-                  <span className="text-5xl">📦</span>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-400">
+                    <PackageSearch size={28} />
+                  </div>
                   <p className="text-lg font-medium text-slate-300">No bookings yet</p>
                   <p className="max-w-xs text-sm">
                     You haven&#39;t booked any cylinders. Head over to Book Cylinder to place your first request.
@@ -109,38 +114,65 @@ export default function BookingsPage() {
                   </Link>
                 </div>
               ) : (
-                <Table>
-                  <THead>
-                    <TR>
-                      <TH>Date</TH>
-                      <TH>Urgency</TH>
-                      <TH>ML Score</TH>
-                      <TH>Priority</TH>
-                      <TH>Queue</TH>
-                      <TH>Status</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
+                <>
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Date</TH>
+                          <TH>Urgency</TH>
+                          <TH>ML Score</TH>
+                          <TH>Priority</TH>
+                          <TH>Queue</TH>
+                          <TH>Status</TH>
+                        </TR>
+                      </THead>
+                      <TBody>
+                        {dbBookings.map((booking) => (
+                          <TR key={booking.id}>
+                            <TD>
+                              {new Date(booking.requestDate).toLocaleDateString()}
+                            </TD>
+                            <TD>
+                              <span className="capitalize">{booking.urgency}</span>
+                            </TD>
+                            <TD>
+                              <Badge className={getScoreBadgeColor(booking.priorityScore)}>
+                                {booking.priorityScore.toFixed(1)}
+                              </Badge>
+                            </TD>
+                            <TD>
+                              <span className="text-sm font-medium">
+                                {getScoreBand(booking.priorityScore)}
+                              </span>
+                            </TD>
+                            <TD>#{booking.queuePosition}</TD>
+                            <TD>
+                              <Badge
+                                variant={
+                                  booking.status === "delivered"
+                                    ? "success"
+                                    : booking.status === "cancelled"
+                                    ? "danger"
+                                    : "warning"
+                                }
+                              >
+                                {booking.status}
+                              </Badge>
+                            </TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  </div>
+
+                  <div className="space-y-3 md:hidden">
                     {dbBookings.map((booking) => (
-                      <TR key={booking.id}>
-                        <TD>
-                          {new Date(booking.requestDate).toLocaleDateString()}
-                        </TD>
-                        <TD>
-                          <span className="capitalize">{booking.urgency}</span>
-                        </TD>
-                        <TD>
-                          <Badge className={getScoreBadgeColor(booking.priorityScore)}>
-                            {booking.priorityScore.toFixed(1)}
-                          </Badge>
-                        </TD>
-                        <TD>
-                          <span className="text-sm font-medium">
-                            {getScoreBand(booking.priorityScore)}
-                          </span>
-                        </TD>
-                        <TD>#{booking.queuePosition}</TD>
-                        <TD>
+                      <div key={booking.id} className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-sm font-medium text-slate-100">
+                            {new Date(booking.requestDate).toLocaleDateString()}
+                          </p>
                           <Badge
                             variant={
                               booking.status === "delivered"
@@ -152,11 +184,22 @@ export default function BookingsPage() {
                           >
                             {booking.status}
                           </Badge>
-                        </TD>
-                      </TR>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                          <p>Urgency: <span className="capitalize text-slate-200">{booking.urgency}</span></p>
+                          <p>Queue: <span className="text-slate-200">#{booking.queuePosition}</span></p>
+                          <p>
+                            Score:{" "}
+                            <span className="text-slate-200">{booking.priorityScore.toFixed(1)}</span>
+                          </p>
+                          <p>
+                            Band: <span className="text-slate-200">{getScoreBand(booking.priorityScore)}</span>
+                          </p>
+                        </div>
+                      </div>
                     ))}
-                  </TBody>
-                </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

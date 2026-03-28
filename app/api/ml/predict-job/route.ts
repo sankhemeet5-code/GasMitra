@@ -19,6 +19,12 @@ interface PredictJobRequest {
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL ?? "http://127.0.0.1:8000";
 
+function getBand(score: number): PriorityPredictionResponse["priority_band"] {
+  if (score > 70) return "high";
+  if (score >= 40) return "medium";
+  return "low";
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as PredictJobRequest;
@@ -89,7 +95,25 @@ export async function POST(request: Request) {
         throw new Error(`ML service error: ${mlResponse.status}`);
       }
 
-      prediction = (await mlResponse.json()) as PriorityPredictionResponse;
+      const raw = (await mlResponse.json()) as Partial<PriorityPredictionResponse>;
+
+      const predicted = Number(raw.predicted_priority_score ?? 0);
+      const bounded = Math.max(0, Math.min(100, Number.isFinite(predicted) ? predicted : 0));
+      const priorityBand =
+        raw.priority_band === "high" ||
+        raw.priority_band === "medium" ||
+        raw.priority_band === "low"
+          ? raw.priority_band
+          : getBand(bounded);
+
+      prediction = {
+        predicted_priority_score: Math.round(bounded * 100) / 100,
+        priority_band: priorityBand,
+        source:
+          raw.source === "heuristic-fallback"
+            ? "heuristic-fallback"
+            : "ml-service",
+      };
     } catch (mlError) {
       // Fallback to heuristic if ML fails
       console.warn("ML service failed, using heuristic fallback:", mlError);

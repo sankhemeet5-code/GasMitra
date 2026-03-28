@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,15 +28,20 @@ export function DistributorSmartQueue({
 }: DistributorSmartQueueProps) {
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
   const [processingBookingId, setProcessingBookingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"priority" | "time">("priority");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const pendingRows = useMemo(() => {
-    const sorted = bookings
-      .filter((b) => b.status === "pending")
-      .sort((a, b) => b.priorityScore - a.priorityScore);
+    const sorted = bookings.filter((b) => b.status === "pending").sort((a, b) => {
+      if (sortBy === "priority") {
+        return b.priorityScore - a.priorityScore;
+      }
+      return new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime();
+    });
     return highPriorityOnly
       ? sorted.filter((b) => b.priorityScore >= 70)
       : sorted;
-  }, [bookings, highPriorityOnly]);
+  }, [bookings, highPriorityOnly, sortBy]);
 
   const stats = useMemo(() => {
     const total = bookings.filter((b) => b.status === "pending").length;
@@ -101,6 +107,13 @@ export function DistributorSmartQueue({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">ML-Optimized Queue</h3>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSortBy((prev) => (prev === "priority" ? "time" : "priority"))}
+            className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-700 px-2.5 text-xs text-slate-300 transition-colors duration-150 hover:bg-slate-800"
+          >
+            <ArrowUpDown size={14} />
+            Sort: {sortBy === "priority" ? "Priority" : "Booking Time"}
+          </button>
           <span className="text-sm text-slate-400">High Priority Only</span>
           <button
             id="ml-high-priority-toggle"
@@ -120,7 +133,7 @@ export function DistributorSmartQueue({
 
       {/* Queue Table */}
       <Card>
-        <CardContent className="overflow-x-auto pt-6">
+        <CardContent className="pt-6">
           {pendingRows.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-slate-500">
               <span className="text-4xl">🎉</span>
@@ -132,97 +145,146 @@ export function DistributorSmartQueue({
               </p>
             </div>
           ) : (
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Customer Name</TH>
-                  <TH>ML Score</TH>
-                  <TH>Days Waiting</TH>
-                  <TH>Urgency</TH>
-                  <TH>BPL</TH>
-                  <TH>Address</TH>
-                  <TH />
-                </TR>
-              </THead>
-              <TBody>
-                {pendingRows.map((booking, idx) => {
-                  const isTop3 = idx < 3;
-                  const customerName = booking.household?.name ?? booking.householdId;
-                  const customerAddress = booking.household?.address ?? "Address unavailable";
-                  const customerBpl = booking.household?.bpl ?? false;
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Customer</TH>
+                      <TH>Priority</TH>
+                      <TH>Status</TH>
+                      <TH>Booking Time</TH>
+                      <TH>Address</TH>
+                      <TH>Actions</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {pendingRows.map((booking, idx) => {
+                      const isTop3 = idx < 3;
+                      const customerName = booking.household?.name ?? booking.householdId;
+                      const customerAddress = booking.household?.address ?? "Address unavailable";
 
-                  const now = new Date();
-                  const bookDate = new Date(booking.requestDate);
-                  const daysSince = Math.floor(
-                    (now.getTime() - bookDate.getTime()) /
-                      (1000 * 60 * 60 * 24)
-                  );
+                      const priorityMeta =
+                        booking.priorityScore >= 70
+                          ? { label: "High", dot: "bg-red-400" }
+                          : booking.priorityScore >= 40
+                          ? { label: "Medium", dot: "bg-amber-400" }
+                          : { label: "Normal", dot: "bg-slate-400" };
+
+                      return (
+                        <TR
+                          key={booking.id}
+                          className={`${
+                            isTop3 ? "bg-amber-500/10" : ""
+                          } border-b border-slate-800`}
+                        >
+                          <TD>
+                            <span className={isTop3 ? "font-semibold text-amber-200" : ""}>
+                              {isTop3 && "🔥 "}
+                              {customerName}
+                            </span>
+                          </TD>
+                          <TD>
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2.5 w-2.5 rounded-full ${priorityMeta.dot}`} />
+                              <span className="text-sm text-slate-200">{priorityMeta.label}</span>
+                            </div>
+                          </TD>
+                          <TD>
+                            <Badge variant="warning">pending</Badge>
+                          </TD>
+                          <TD>{booking.requestDate}</TD>
+                          <TD className="text-xs text-slate-400">
+                            {customerAddress.length > 36 ? `${customerAddress.slice(0, 36)}...` : customerAddress}
+                          </TD>
+                          <TD>
+                            <div className="relative flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  setOpenMenuId((prev) =>
+                                    prev === booking.id ? null : booking.id
+                                  )
+                                }
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 text-slate-300 transition-colors duration-150 hover:bg-slate-800"
+                                aria-label="Order actions"
+                              >
+                                <MoreHorizontal size={16} />
+                              </button>
+                              {openMenuId === booking.id && (
+                                <div className="absolute right-11 top-0 z-20 w-44 rounded-md border border-slate-700 bg-slate-900 p-1 text-xs shadow-lg">
+                                  <button className="w-full rounded px-2 py-1.5 text-left text-slate-300 hover:bg-slate-800">Assign Driver</button>
+                                  <button className="w-full rounded px-2 py-1.5 text-left text-slate-300 hover:bg-slate-800">Mark Confirmed</button>
+                                  <button className="w-full rounded px-2 py-1.5 text-left text-slate-300 hover:bg-slate-800">View Details</button>
+                                  <button className="w-full rounded px-2 py-1.5 text-left text-red-300 hover:bg-red-500/10">Cancel</button>
+                                </div>
+                              )}
+
+                              <Button
+                                size="sm"
+                                disabled={processingBookingId === booking.id}
+                                onClick={async () => {
+                                  setProcessingBookingId(booking.id);
+                                  const ok = await onMarkDelivered(booking.id);
+                                  if (ok) {
+                                    toast.success(`Delivery marked for ${customerName}`);
+                                  }
+                                  setProcessingBookingId(null);
+                                }}
+                              >
+                                {processingBookingId === booking.id ? "Saving..." : "Deliver"}
+                              </Button>
+                            </div>
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                  </TBody>
+                </Table>
+              </div>
+
+              <div className="space-y-3 md:hidden">
+                {pendingRows.map((booking) => {
+                  const customerName = booking.household?.name ?? booking.householdId;
+                  const priorityMeta =
+                    booking.priorityScore >= 70
+                      ? { label: "High", dot: "bg-red-400" }
+                      : booking.priorityScore >= 40
+                      ? { label: "Medium", dot: "bg-amber-400" }
+                      : { label: "Normal", dot: "bg-slate-400" };
 
                   return (
-                    <TR
-                      key={booking.id}
-                      className={`${
-                        isTop3 ? "bg-amber-500/10" : ""
-                      } border-b border-slate-800`}
-                    >
-                      <TD>
-                        <span className={isTop3 ? "font-semibold text-amber-200" : ""}>
-                          {isTop3 && "🔥 "}
-                          {customerName}
-                        </span>
-                      </TD>
-                      <TD>
-                        <Badge
-                          className={
-                            booking.priorityScore >= 70
-                              ? "bg-red-500"
-                              : booking.priorityScore >= 40
-                              ? "bg-amber-500"
-                              : "bg-teal-500"
+                    <div key={booking.id} className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-sm font-medium text-slate-100">{customerName}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2.5 w-2.5 rounded-full ${priorityMeta.dot}`} />
+                          <span className="text-xs text-slate-300">{priorityMeta.label}</span>
+                        </div>
+                      </div>
+                      <div className="mb-3 text-xs text-slate-400">
+                        <p>Booking Time: <span className="text-slate-200">{booking.requestDate}</span></p>
+                        <p>Status: <span className="text-amber-300">pending</span></p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={processingBookingId === booking.id}
+                        onClick={async () => {
+                          setProcessingBookingId(booking.id);
+                          const ok = await onMarkDelivered(booking.id);
+                          if (ok) {
+                            toast.success(`Delivery marked for ${customerName}`);
                           }
-                        >
-                          {booking.priorityScore.toFixed(1)}
-                        </Badge>
-                      </TD>
-                      <TD>{daysSince} d</TD>
-                      <TD>
-                        <Badge
-                          variant={
-                            booking.urgency === "medical"
-                              ? "danger"
-                              : booking.urgency === "bpl"
-                              ? "warning"
-                              : "default"
-                          }
-                        >
-                          {booking.urgency}
-                        </Badge>
-                      </TD>
-                      <TD>{customerBpl ? "✓" : "—"}</TD>
-                      <TD className="text-xs text-slate-400">
-                        {customerAddress.slice(0, 30)}...
-                      </TD>
-                      <TD>
-                        <Button
-                          size="sm"
-                          disabled={processingBookingId === booking.id}
-                          onClick={async () => {
-                            setProcessingBookingId(booking.id);
-                            const ok = await onMarkDelivered(booking.id);
-                            if (ok) {
-                              toast.success(`Delivery marked for ${customerName}`);
-                            }
-                            setProcessingBookingId(null);
-                          }}
-                        >
-                          {processingBookingId === booking.id ? "Saving..." : "Deliver"}
-                        </Button>
-                      </TD>
-                    </TR>
+                          setProcessingBookingId(null);
+                        }}
+                      >
+                        {processingBookingId === booking.id ? "Saving..." : "Deliver"}
+                      </Button>
+                    </div>
                   );
                 })}
-              </TBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
