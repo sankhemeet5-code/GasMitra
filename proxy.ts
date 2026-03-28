@@ -19,7 +19,7 @@ const ROUTE_ROLES: Record<string, UserRole[]> = {
   "/ai-insights": ["admin"],
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const rawRole = request.cookies.get("gasmitra_role")?.value;
   const role = rawRole as UserRole | undefined;

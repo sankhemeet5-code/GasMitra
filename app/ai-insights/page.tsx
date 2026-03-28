@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { RoleGuard } from "@/components/role-guard";
 import { AIInsightCard } from "@/components/ai-insight-card";
+import { MlPriorityPanel } from "@/components/ml-priority-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,8 @@ export default function AIInsightsPage() {
             output="Suggestion: prioritize route Aurangabad → Nashik with emergency lane for medical urgency households."
           />
         </div>
+
+        <MlPriorityPanel />
 
         <Card className="mt-4">
           <CardHeader>

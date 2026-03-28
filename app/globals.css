@@ -57,3 +57,15 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* Keep map layers below app overlays (sidebar, dialogs, chatbot, etc.). */
+.leaflet-container,
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 0 !important;
+}
+
+.leaflet-control {
+  z-index: 1 !important;
+}

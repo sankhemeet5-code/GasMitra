@@ -19,6 +19,7 @@ interface AppState {
   stockOverride: Record<string, number>;
   customerProfile: CustomerProfile | null;
   setRole: (role: UserRole) => void;
+  setCurrentUserId: (userId: string) => void;
   setCrisisLevel: (level: CrisisLevel) => void;
   addBooking: (booking: Booking) => void;
   markDelivered: (bookingId: string) => void;
@@ -42,6 +43,8 @@ export const useAppStore = create<AppState>()(
         set({ role });
       },
 
+      setCurrentUserId: (currentUserId) => set({ currentUserId }),
+
       setCrisisLevel: (crisisLevel) => set({ crisisLevel }),
 
       addBooking: (booking) =>
@@ -63,13 +66,14 @@ export const useAppStore = create<AppState>()(
 
       logout: () => {
         setCookie("gasmitra_role", "", 0);
-        set({ role: "customer", customerProfile: null });
+        set({ role: "customer", currentUserId: "", customerProfile: null });
       },
     }),
     {
       name: "gasmitra-storage",
       partialize: (state) => ({
         role: state.role,
+        currentUserId: state.currentUserId,
         customerProfile: state.customerProfile,
       }),
       onRehydrateStorage: () => (state) => {

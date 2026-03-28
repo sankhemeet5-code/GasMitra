@@ -52,3 +52,22 @@ export interface AlertItem {
   message: string;
   severity: "medium" | "high";
 }
+
+export interface PriorityPredictionRequest {
+  days_since_last_booking: number;
+  is_bpl: 0 | 1;
+  urgency: UrgencyType;
+  crisis_level: CrisisLevel;
+  cylinders_requested: number;
+  stock_at_distributor: number;
+  queue_position: number;
+  location_changes_30d: number;
+  booking_gap_days: number;
+}
+
+export interface PriorityPredictionResponse {
+  predicted_priority_score: number;
+  priority_band: "low" | "medium" | "high";
+  source: "ml-service" | "heuristic-fallback";
+  note?: string;
+}
