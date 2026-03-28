@@ -12,35 +12,37 @@ function stockColor(stock: number) {
 
 export function DistributorMap({ distributors }: { distributors: Distributor[] }) {
   return (
-    <MapContainer
-      center={[19.5, 75.7]}
-      zoom={6}
-      scrollWheelZoom={false}
-      className="h-[340px] w-full rounded-xl"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {distributors.map((item) => (
-        <CircleMarker
-          key={item.id}
-          center={[item.lat, item.lng]}
-          radius={12}
-          pathOptions={{ color: stockColor(item.stock), fillColor: stockColor(item.stock), fillOpacity: 0.6 }}
-        >
-          <Popup>
-            <strong>{item.name}</strong>
-            <br />
-            Stock: {item.stock}
-            <br />
-            {item.district}
-          </Popup>
-        </CircleMarker>
-      ))}
-      <Marker position={[19.5, 75.7]}>
-        <Popup>Maharashtra distribution area</Popup>
-      </Marker>
-    </MapContainer>
+    <div className="relative z-0 overflow-hidden rounded-xl">
+      <MapContainer
+        center={[19.5, 75.7]}
+        zoom={6}
+        scrollWheelZoom={false}
+        className="h-[340px] w-full"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {distributors.map((item) => (
+          <CircleMarker
+            key={item.id}
+            center={[item.lat, item.lng]}
+            radius={12}
+            pathOptions={{ color: stockColor(item.stock), fillColor: stockColor(item.stock), fillOpacity: 0.6 }}
+          >
+            <Popup>
+              <strong>{item.name}</strong>
+              <br />
+              Stock: {item.stock}
+              <br />
+              {item.district}
+            </Popup>
+          </CircleMarker>
+        ))}
+        <Marker position={[19.5, 75.7]}>
+          <Popup>Maharashtra distribution area</Popup>
+        </Marker>
+      </MapContainer>
+    </div>
   );
 }

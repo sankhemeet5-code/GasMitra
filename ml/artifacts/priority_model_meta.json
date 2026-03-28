@@ -1,0 +1,32 @@
+{
+  "target": "target_priority_score",
+  "features": [
+    "days_since_last_booking",
+    "is_bpl",
+    "urgency",
+    "crisis_level",
+    "cylinders_requested",
+    "stock_at_distributor",
+    "queue_position",
+    "location_changes_30d",
+    "booking_gap_days"
+  ],
+  "categorical_features": [
+    "urgency",
+    "crisis_level"
+  ],
+  "numerical_features": [
+    "days_since_last_booking",
+    "is_bpl",
+    "cylinders_requested",
+    "stock_at_distributor",
+    "queue_position",
+    "location_changes_30d",
+    "booking_gap_days"
+  ],
+  "metrics": {
+    "mae": 3.3189641126826874,
+    "rmse": 4.222160065498608,
+    "r2": 0.9377836589297736
+  }
+}

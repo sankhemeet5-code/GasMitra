@@ -1,0 +1,119 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User roles: customer, distributor, admin
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String   @unique
+  role      String   // "customer", "distributor", "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  household   Household?
+  distributor Distributor?
+  bookings    Booking[]
+}
+
+// Customer household information
+model Household {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name             String   // Full name as per Aadhaar
+  address          String
+  pincode          String
+  aadhaarMasked    String   // Masked Aadhaar (XXXX-XXXX-1234)
+  phoneMasked      String   // Masked phone (9XXXX1234)
+  bpl              Boolean  // Below Poverty Line status
+  lastBookingDate  DateTime @default(now())
+  
+  // Tracking
+  locationChanges30d  Int @default(0)  // Number of address changes in last 30 days
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  bookings         Booking[]
+}
+
+// Distributor information
+model Distributor {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String   // Distributor name (e.g., "MahaGas Aurangabad")
+  district  String
+  pincode   String
+  address   String
+  latitude  Float
+  longitude Float
+  stock     Int      @default(0)  // Available cylinders
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bookings  Booking[]
+}
+
+// Booking requests (created by customers)
+model Booking {
+  id               String   @id @default(cuid())
+  householdId      String
+  household        Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  distributorId    String?
+  distributor      Distributor? @relation(fields: [distributorId], references: [id])
+  
+  requestDate      DateTime @default(now())
+  cylindersRequested Int    @default(1)
+  urgency          String   // "medical", "bpl", "regular"
+  queuePosition    Int?
+  status           String   @default("pending")  // "pending", "delivered", "cancelled"
+  
+  // ML scoring
+  priorityScore    Float?
+  priorityBand     String?  // "high", "medium", "low"
+  mlSource         String?  // "ml-service", "heuristic-fallback"
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([householdId])
+  @@index([distributorId])
+  @@index([status])
+}
+
+// System settings (crisis level, etc.)
+model SystemConfig {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  value        String
+  updatedAt    DateTime @updatedAt
+}
+
+// ML prediction logs (for audit trail)
+model PredictionLog {
+  id               String   @id @default(cuid())
+  bookingId        String?
+  
+  inputFeatures    String   @db.Text  // JSON string of input features
+  predictedScore   Float
+  priorityBand     String
+  source           String   // "ml-service", "heuristic-fallback"
+  
+  createdAt        DateTime @default(now())
+}

@@ -16,6 +16,32 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## ML Priority Prediction Integration
+
+The AI Insights page now includes a **Priority Prediction Workbench** that calls:
+
+- Next API bridge: `/api/ml/priority`
+- Python ML service endpoint: `/predict/priority`
+
+### Run with real ML predictions
+
+1. Start the Python API service from the project root:
+
+```bash
+uvicorn ml.api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+2. In a separate terminal, run the Next app:
+
+```bash
+npm run dev
+```
+
+By default the bridge uses `http://127.0.0.1:8000`.
+To use a different ML service URL, set `ML_SERVICE_URL` before starting Next.
+
+If the ML API is offline, the app returns a local fallback estimate so the UI stays responsive.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

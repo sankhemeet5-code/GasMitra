@@ -14,12 +14,6 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/hooks/use-app-store";
 
-/* ── mock credentials (would be server-validated in production) ── */
-const VALID_CREDENTIALS: Record<string, string> = {
-  ADMIN001: "admin@123",
-  ADMIN002: "admin@456",
-};
-
 const inputClass =
   "w-full rounded-xl border border-slate-700/60 bg-slate-800/60 py-3 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/20 disabled:opacity-50";
 
@@ -27,7 +21,7 @@ const labelClass = "mb-1.5 block text-xs font-medium text-slate-400";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { setRole } = useAppStore();
+  const { setRole, setCurrentUserId } = useAppStore();
 
   const [adminId, setAdminId] = useState("");
   const [password, setPassword] = useState("");
@@ -53,10 +47,18 @@ export default function AdminLoginPage() {
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1100));
 
-    const expected = VALID_CREDENTIALS[adminId.trim().toUpperCase()];
-    if (!expected || expected !== password) {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "admin",
+        loginId: adminId.trim().toUpperCase(),
+        password,
+      }),
+    });
+
+    if (!response.ok) {
       setLoading(false);
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
@@ -72,7 +74,12 @@ export default function AdminLoginPage() {
       return;
     }
 
+    const data = (await response.json()) as { userId?: string };
+
     setRole("admin");
+    if (data.userId) {
+      setCurrentUserId(data.userId);
+    }
     router.push("/admin");
   }
 
