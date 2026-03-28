@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { RoleGuard } from "@/components/role-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -14,11 +15,11 @@ import { useAppStore } from "@/hooks/use-app-store";
 import { UrgencyType } from "@/types";
 
 export default function BookPage() {
-  const user = households[0];
+  const user      = households[0];
   const addBooking = useAppStore((s) => s.addBooking);
   const [distributorId, setDistributorId] = useState(distributors[0].id);
   const [urgency, setUrgency] = useState<UrgencyType>("medical");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]       = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
 
   const result = useMemo(
@@ -50,59 +51,76 @@ export default function BookPage() {
   };
 
   return (
-    <AppShell>
-      <h1 className="mb-4 text-2xl font-semibold">Book Cylinder</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Transparent Booking Form</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-slate-300">Address</label>
-            <Input value={user.address} readOnly />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-slate-300">Distributor</label>
-            <Select value={distributorId} onChange={(e) => setDistributorId(e.target.value)}>
-              {distributors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.pincode})
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-slate-300">Urgency</label>
-            <Select value={urgency} onChange={(e) => setUrgency(e.target.value as UrgencyType)}>
-              <option value="medical">Medical</option>
-              <option value="bpl">BPL Household</option>
-              <option value="regular">Regular</option>
-            </Select>
-          </div>
+    <RoleGuard>
+      <AppShell>
+        <h1 className="mb-4 text-2xl font-bold">Book Cylinder</h1>
 
-          <div className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-            Your score is <span className="font-bold text-teal-300">{result.score}</span> because:
-            <ul className="mt-2 list-disc pl-5">
-              <li>Last booking: {result.breakdown.days} days ago</li>
-              <li>BPL: {user.bpl ? "Yes" : "No"}</li>
-              <li>Urgency: {urgency}</li>
-            </ul>
-          </div>
-          <Button onClick={submit}>Submit Booking</Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Transparent Booking Form</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm text-slate-300">Address</label>
+              <Input id="booking-address" value={user.address} readOnly />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-300">Distributor</label>
+              <Select
+                id="booking-distributor"
+                value={distributorId}
+                onChange={(e) => setDistributorId(e.target.value)}
+              >
+                {distributors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.pincode})
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-300">Urgency</label>
+              <Select
+                id="booking-urgency"
+                value={urgency}
+                onChange={(e) => setUrgency(e.target.value as UrgencyType)}
+              >
+                <option value="medical">Medical</option>
+                <option value="bpl">BPL Household</option>
+                <option value="regular">Regular</option>
+              </Select>
+            </div>
 
-      <SimpleDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Booking Confirmed"
-        description={
-          <div>
-            <p>Queue position: #{queuePosition}</p>
-            <p className="mt-1">Your request is visible in the distributor fair-priority queue.</p>
-          </div>
-        }
-      />
-    </AppShell>
+            <div className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+              Your score is{" "}
+              <span className="font-bold text-teal-300">{result.score}</span> because:
+              <ul className="mt-2 list-disc pl-5 space-y-0.5">
+                <li>Last booking: {result.breakdown.days} days ago</li>
+                <li>BPL household: {user.bpl ? "Yes (+25)" : "No (+5)"}</li>
+                <li>Urgency: {urgency}</li>
+              </ul>
+            </div>
+
+            <Button id="submit-booking-btn" onClick={submit}>
+              Submit Booking
+            </Button>
+          </CardContent>
+        </Card>
+
+        <SimpleDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Booking Confirmed ✅"
+          description={
+            <div>
+              <p>Queue position: <strong>#{queuePosition}</strong></p>
+              <p className="mt-1 text-slate-400">
+                Your request is now visible in the distributor fair-priority queue.
+              </p>
+            </div>
+          }
+        />
+      </AppShell>
+    </RoleGuard>
   );
 }
