@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* ── Tailwind v4: class-based dark mode (driven by ThemeProvider) ── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+
 :root {
   --background: #0f172a;
   --foreground: #e2e8f0;
@@ -17,7 +21,39 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ── Light / Dark Mode ───────────────────────────────── */
+.light body {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
+/* ── Smooth marquee animation ────────────────────────── */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 40s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Smooth scroll ───────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
 }
