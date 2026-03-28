@@ -13,12 +13,6 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/hooks/use-app-store";
 
-/* ── mock credentials (would be server-validated in production) ── */
-const VALID_CREDENTIALS: Record<string, string> = {
-  DIST001: "dist@123",
-  DIST002: "dist@456",
-};
-
 const inputClass =
   "w-full rounded-xl border border-slate-700/60 bg-slate-800/60 py-3 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50";
 
@@ -26,7 +20,7 @@ const labelClass = "mb-1.5 block text-xs font-medium text-slate-400";
 
 export default function DistributorLoginPage() {
   const router = useRouter();
-  const { setRole } = useAppStore();
+  const { setRole, setCurrentUserId } = useAppStore();
 
   const [distId, setDistId] = useState("");
   const [password, setPassword] = useState("");
@@ -48,16 +42,29 @@ export default function DistributorLoginPage() {
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1100)); // mock latency
 
-    const expected = VALID_CREDENTIALS[distId.trim().toUpperCase()];
-    if (!expected || expected !== password) {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "distributor",
+        loginId: distId.trim().toUpperCase(),
+        password,
+      }),
+    });
+
+    if (!response.ok) {
       setLoading(false);
       setError("Invalid Distributor ID or password. Please check your credentials.");
       return;
     }
 
+    const data = (await response.json()) as { userId?: string };
+
     setRole("distributor");
+    if (data.userId) {
+      setCurrentUserId(data.userId);
+    }
     router.push("/distributor");
   }
 

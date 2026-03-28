@@ -50,7 +50,7 @@ const labelClass = "mb-1.5 block text-xs font-medium text-slate-400";
 
 export default function CustomerAuthPage() {
   const router = useRouter();
-  const { setRole, setCustomerProfile } = useAppStore();
+  const { setRole, setCustomerProfile, setCurrentUserId } = useAppStore();
   const [tab, setTab] = useState<Tab>("login");
 
   /* ── sign-up state ─────────────────────────────── */
@@ -122,8 +122,6 @@ export default function CustomerAuthPage() {
     if (!validateSignup()) return;
 
     setSignupLoading(true);
-    await new Promise((r) => setTimeout(r, 1400)); // mock network delay
-
     const profile: CustomerProfile = {
       name: form.name.trim(),
       phone: form.phone,
@@ -136,12 +134,30 @@ export default function CustomerAuthPage() {
         : undefined,
     };
 
-    setCustomerProfile(profile);
-    setRole("customer");
-    setSignupLoading(false);
-    setSignupDone(true);
+    try {
+      const response = await fetch("/api/auth/customer/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
 
-    setTimeout(() => router.push("/dashboard"), 1000);
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Signup failed");
+      }
+
+      const data = (await response.json()) as { userId: string };
+      setCustomerProfile(profile);
+      setCurrentUserId(data.userId);
+      setRole("customer");
+      setSignupDone(true);
+      setTimeout(() => router.push("/dashboard"), 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Signup failed";
+      setFormErrors((prev) => ({ ...prev, phone: message }));
+    } finally {
+      setSignupLoading(false);
+    }
   }
 
   /* ── login: send OTP ───────────────────────────── */
@@ -153,11 +169,26 @@ export default function CustomerAuthPage() {
     }
     setLoginPhoneError("");
     setSendingOtp(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSendingOtp(false);
-    setOtpSent(true);
-    setCountdown(30);
-    setLoginStep("otp");
+
+    try {
+      const response = await fetch("/api/auth/customer/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: loginPhone }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        setLoginPhoneError(data.error ?? "Unable to request OTP");
+        return;
+      }
+
+      setOtpSent(true);
+      setCountdown(30);
+      setLoginStep("otp");
+    } finally {
+      setSendingOtp(false);
+    }
   }
 
   /* ── OTP input handling ───────────────────────── */
@@ -194,11 +225,28 @@ export default function CustomerAuthPage() {
     }
     setOtpError("");
     setVerifyingOtp(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    // Mock: any 6-digit OTP passes
-    setRole("customer");
-    setVerifyingOtp(false);
-    router.push("/dashboard");
+
+    try {
+      const response = await fetch("/api/auth/customer/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: loginPhone, otp: code }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        setOtpError(data.error ?? "OTP verification failed");
+        return;
+      }
+
+      const data = (await response.json()) as { userId: string };
+
+      setCurrentUserId(data.userId);
+      setRole("customer");
+      router.push("/dashboard");
+    } finally {
+      setVerifyingOtp(false);
+    }
   }
 
   /* ── field updater ─────────────────────────────── */
